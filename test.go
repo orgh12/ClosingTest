@@ -45,6 +45,9 @@ func main() {
 		"ShellExperienceHost.exe":     true,
 		"StartMenuExperienceHost.exe": true,
 		"backgroundTaskHost.exe":      true,
+		"smartscreen.exe":             true,
+		"WmiPrvSE.exe":                true,
+		"runnerw.exe":                 true,
 	}
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -87,38 +90,42 @@ func main() {
 
 			// If the process is not in the current list, it's new
 			if !found {
-				//fmt.Printf("New process detected: %d\t%s\n", newProcess.Pid(), newProcess.Executable())
+				//fmt.Printf("New process detected: %dmd\t%s\n", newProcess.Pid(), newProcess.Executable())
 				if !importantProcesses[newProcess.Executable()] && !programOpened[newProcess.Pid()] {
 					go func() {
 						kill := exec.Command("TASKKILL", "/T", "/F", "/IM", newProcess.Executable())
-						fmt.Println("TASKKILL", "/T", "/F", "/IM", newProcess.Executable(), newProcess.Pid())
+						//fmt.Println("TASKKILL", "/T", "/F", "/IM", newProcess.Executable(), newProcess.Pid())
 						kill.Stderr = os.Stderr
 						kill.Stdout = os.Stdout
 						err := kill.Run()
 						if err != nil {
 							fmt.Println("kill error", newProcess.Executable(), err)
 						}
+						if err == nil {
+							fmt.Println("killed: ", newProcess.Executable(), " ", newProcess.Pid())
+							if len(files) == 0 {
+								fmt.Println("No files found in Downloads directory")
+								return
+							}
+							randomIndex := rand.Intn(len(files))
+							randomFile := files[randomIndex]
 
-						if len(files) == 0 {
-							fmt.Println("No files found in Downloads directory")
-							return
+							// Open the file.
+							filePath := filepath.Join(downloadsDir, randomFile.Name())
+							// open the file using the default program associated with it
+							cmd := exec.Command("cmd", "/c", "start", filePath)
+							err = cmd.Run()
+							if err != nil {
+								fmt.Println("Error opening file:", err)
+								return
+							}
+
+							// Get the process ID of the program that opened the file.
+							pid := cmd.Process.Pid
+							fmt.Println(pid, " ", cmd.Process, " ", newProcess.Executable(), " ", newProcess.Pid())
+							programOpened[pid] = true
 						}
-						randomIndex := rand.Intn(len(files))
-						randomFile := files[randomIndex]
 
-						// Open the file.
-						filePath := filepath.Join(downloadsDir, randomFile.Name())
-						// open the file using the default program associated with it
-						cmd := exec.Command("cmd", "/c", "start", filePath)
-						err = cmd.Run()
-						if err != nil {
-							fmt.Println("Error opening file:", err)
-							return
-						}
-
-						// Get the process ID of the program that opened the file.
-						pid := cmd.Process.Pid
-						programOpened[pid] = true
 					}()
 				} else {
 					//fmt.Println("Process is important and will not be terminated.:", newProcess.Executable())
